@@ -30,11 +30,11 @@ jobs:
       - name: Bump to pre-release version
         run: |
           git fetch origin main
-          git checkout -b update-version origin/main
+          git checkout -b version-bump origin/main
           IFS='.' read -r MAJOR MINOR PATCH <<<"${{ steps.get_ver.outputs.version }}"
           NEXT_VERSION="$MAJOR.$MINOR.$((PATCH+1))-pre"
           echo "Bumping to version: $NEXT_VERSION"
           sed -i "s/__version__ = \".*\"/__version__ = \"$NEXT_VERSION\"/" lib_version/__version__.py
           git add lib_version/__version__.py
           git commit -m "chore: bump to $NEXT_VERSION [skip ci]"
-          git push origin update-version:main
+          git push origin version-bump:main
