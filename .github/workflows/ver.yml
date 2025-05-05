@@ -27,16 +27,14 @@ jobs:
           VER=$(grep -oP '__version__\s*=\s*"\K[^"]+' lib_version/__version__.py)
           echo "version=$VER" >> "$GITHUB_OUTPUT"
 
-      - name: Bump to pre-release version
+      - name: Pre-relase bump
         run: |
           git fetch origin main
-          git checkout -b main origin/main
+          git checkout -b bump-version origin/main
           IFS='.' read -r MAJOR MINOR PATCH <<<"${{ steps.get_ver.outputs.version }}"
           NEXT_VERSION="$MAJOR.$MINOR.$((PATCH+1))-pre"
           echo "Bumping to version: $NEXT_VERSION"
           sed -i "s/__version__ = \".*\"/__version__ = \"$NEXT_VERSION\"/" lib_version/__version__.py
           git add lib_version/__version__.py
           git commit -m "chore: bump to $NEXT_VERSION [skip ci]"
-          git push origin HEAD:refs/heads/main
-
-
+          git push origin bump-version:main
