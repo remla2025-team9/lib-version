@@ -1,0 +1,38 @@
+name: Bump Version on Main After Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  bump-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Read released version
+        id: get_ver
+        run: |
+          VER=$(grep -oP '__version__\s*=\s*"\K[^"]+' lib_version/__version__.py)
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Bump to pre-release version
+        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<<"${{ steps.get_ver.outputs.version }}"
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH+1))-pre"
+          echo "Bumping to version: $NEXT_VERSION"
+          sed -i "s/__version__ = \".*\"/__version__ = \"$NEXT_VERSION\"/" lib_version/__version__.py
+          git add lib_version/__version__.py
+          git commit -m "chore: bump to $NEXT_VERSION [skip ci]"
+          git push origin HEAD:main
