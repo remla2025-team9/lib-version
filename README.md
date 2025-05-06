@@ -1,7 +1,7 @@
 # lib-version
 
-A lightweight Python utility library that provides a `VersionUtil` class for retrieving the current version of the package.  
-It’s designed for reuse in other REMLA services such as `app-service`.
+A Python utility library that provides a `VersionUtil` class for retrieving the current version of the package.  
+This library is intended for reuse across other services like `app-service`.
 
 ---
 
@@ -47,7 +47,14 @@ python test_version.py
 **Backend**:
 
 ```python
-VersionUtil.get_version()
+from flask import Flask, jsonify
+from lib_version.version_util import VersionUtil
+
+app = Flask(__name__)
+
+@app.route("/api/version")
+def get_lib_version():
+    return jsonify({"lib_version": VersionUtil.get_version()})
 ```
 
 **Frontend**:
