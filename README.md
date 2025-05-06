@@ -1,61 +1,81 @@
 # lib-version
 
-A lightweight Python utility library developed for the REMLA course. It provides a way to retrieve the current version of the package using a `VersionUtil` class.
-
-This library is intended to be used across other services like `app-service` to expose consistent versioning information, useful in logs, debugging, and UI.
+A Python utility library that provides a `VersionUtil` class for retrieving the current version of the package.  
+This library is intended for reuse across other services like `app-service`.
 
 ---
 
 ## Features
 
-- `VersionUtil.get_version()` returns the current version as defined in `__version__.py`
-- Version string is automatically updated via GitHub Actions (`delivery.yml` and `ver.yml`)
-- Git tags and pre-release bumps are handled using semantic versioning
-- Distributed as a Python package with both `sdist` and `wheel` builds
+- Retrieves version from `__version__.py`
+- Automatically updated using GitHub Actions and tags
+- Can be installed via pip from GitHub
 
 ---
 
-## How to Use
+## Install
+
+```bash
+pip install git+https://github.com/remla2025-team9/lib-version.git@v1.0.0
+```
+
+---
+
+## Use
 
 ```python
 from lib_version.version_util import VersionUtil
-
 print(VersionUtil.get_version())
 ```
 
-Or run directly from the terminal:
+or from terminal:
 
 ```bash
 python lib_version/version_util.py
 ```
 
----
-
-## How to Check the Version
-
-You can also run the following script to check the current version:
+Quick check:
 
 ```bash
 python test_version.py
 ```
 
-It will print something like:
+---
 
+## Integrate in Other Services
+
+**Backend**:
+
+```python
+from flask import Flask, jsonify
+from lib_version.version_util import VersionUtil
+
+app = Flask(__name__)
+
+@app.route("/api/version")
+def get_lib_version():
+    return jsonify({"lib_version": VersionUtil.get_version()})
 ```
-Library Version: 1.0.4-pre
+
+**Frontend**:
+
+```javascript
+fetch("/api/version")
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("lib-version").textContent = `lib-version: ${data.lib_version}`;
+  });
 ```
 
 ---
 
-## Triggering a New Version
-
-To tag and bump a new version:
+## Tagging a New Version
 
 ```bash
 git tag v1.0.3
 git push origin v1.0.3
 ```
 
-This will:
-- Run the `delivery.yml` workflow to build and upload the Python package
-- Run the `ver.yml` workflow to bump the version on `main` to something like `1.0.4-pre`
+This runs:
+- `delivery.yml` to build and upload
+- `ver.yml` to bump to next `-pre` version
