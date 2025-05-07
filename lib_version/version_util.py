@@ -1,4 +1,4 @@
-from lib_version._version_ import _version_
+from lib_version._version_ import __version__
 
 class VersionUtil:
     @staticmethod
