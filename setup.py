@@ -7,7 +7,7 @@ with open(os.path.join("lib_version", "__version__.py")) as f:
     exec(f.read(), version)
 
 setup(
-    name="lib-version",
+    name="lib_version",
     version=version["__version__"],
     description="A reusable Python library for retrieving its own version.",
     author="Your Team",
