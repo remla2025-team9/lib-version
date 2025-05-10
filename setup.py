@@ -10,7 +10,6 @@ setup(
     name="lib-version",
     version=version["__version__"],
     description="A reusable Python library for retrieving its own version.",
-    author="Your Team",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[],
