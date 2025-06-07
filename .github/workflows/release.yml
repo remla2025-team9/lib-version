@@ -1,4 +1,4 @@
-name: Bump
+name: Release
 
 on:
   push:
@@ -9,40 +9,41 @@ permissions:
   contents: write
 
 jobs:
-  bump-main:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0    # checks out the tagged commit on meta
+
+      - name: Build package
+        run: |
+          pip install setuptools wheel
+          python setup.py sdist bdist_wheel
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/*
 
       - name: Set up Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Read released version
+      - name: Read version
         id: get_ver
         run: |
           VERSION=$(sed -n 's/^__version__ = "\([^"]*\)".*$/\1/p' lib_version/version.py)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Bump to pre-release version
+      - name: Bump version
         run: |
-          git fetch origin main
-          git checkout -B version-bump origin/main
-
           BASE=$(echo "${{ steps.get_ver.outputs.version }}" | cut -d- -f1)
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
           NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre"
-
           sed -E "s/__version__ = \".*\"/__version__ = \"$NEXT\"/" lib_version/version.py > tmp
           mv tmp lib_version/version.py
-
           git add lib_version/version.py
           git commit -m "chore: bump to $NEXT [skip ci]"
-          git push origin version-bump:main
-
-      - name: Cleanup
-        if: always()
-        run: git branch -D version-bump || true
+          git push origin HEAD:main
