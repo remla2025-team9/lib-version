@@ -44,8 +44,7 @@ jobs:
           git add lib_version/version.py
           git commit -m "chore: bump to $NEXT [skip ci]"
           git push origin version-bump:main
-
-
+          
       - name: Cleanup
         if: always()
         run: git branch -D version-bump || true
