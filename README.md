@@ -17,6 +17,8 @@ This library is intended for reuse across other services like `app-service`.
 
 ```bash
 pip install git+https://github.com/remla2025-team9/lib-version.git@v0.2.0
+```
+
 ---
 
 ## Use
