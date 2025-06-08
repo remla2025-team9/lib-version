@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with: { python-version: '3.8' }
+      - name: Build & upload
+        run: |
+          pip install setuptools wheel
+          python setup.py sdist bdist_wheel
+          # (upload step here if you need)
+
+  bump:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Read version
+        id: get_ver
+        run: |
+          echo "::set-output name=ver::$(grep -oP '(?<=__version__\s*=\s*\")[^"]+' lib_version/version.py)"
+      - name: Bump to pre-release
+        run: |
+          git checkout -B version-bump origin/main
+          BASE=$(echo "${{ steps.get_ver.outputs.ver }}" | cut -d'-' -f1)
+          IFS='.' read M N P <<<"$BASE"
+          NEXT="$M.$N.$((P+1))-pre"
+          sed -E "s/__version__ = \".*\"/__version__ = \"$NEXT\"/" lib_version/version.py > tmp && mv tmp lib_version/version.py
+          git add lib_version/version.py
+          git commit -m "chore: bump to $NEXT [skip ci]"
+          git push origin version-bump:main

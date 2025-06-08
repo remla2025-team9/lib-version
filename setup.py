@@ -1,20 +1,17 @@
 from setuptools import setup, find_packages
-import os
-
-# Dynamically load the version
-version = {}
-with open(os.path.join("lib_version", "__version__.py")) as f:
-    exec(f.read(), version)
+from lib_version.version import __version__
 
 setup(
-    name="lib_version",
-    version=version["__version__"],
-    description="A reusable Python library for retrieving its own version.",
+    name="lib-version",
+    version=__version__,
     packages=find_packages(),
-    include_package_data=True,
     install_requires=[],
+    include_package_data=True,
+    description="Lightweight version utility for reuse in REMLA services",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License"
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
     ],
+    python_requires='>=3.6',
 )
