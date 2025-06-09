@@ -2,8 +2,8 @@ name: Delivery
 
 on:
   push:
-    branches: [main]
-    tags: ['v*.*.*']
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -13,18 +13,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Auto-tag pre-releases
-        if: github.ref == 'refs/heads/main'
-        uses: mathieudutour/github-tag-action@v6.2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag_prefix: v
-          default_bump: patch
-          release_branches: ""
-          pre_release_branches: main
-          default_prerelease_bump: prerelease
-          append_to_pre_release_tag: pre
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Determine next pre-release
+        id: compute
+        run: |
+          LATEST=$(git tag --list '*-pre*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
+            COUNT=1
+          else
+            BASE=${LATEST#v}
+            BASE=${BASE%-pre*}
+            COUNT=${LATEST##*-pre}
+            COUNT=$((COUNT+1))
+          fi
+          NEXT="$BASE-pre$COUNT"
+          echo "next=$NEXT" >> $GITHUB_OUTPUT
+
+      - name: Write new pre-release
+        run: |
+          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
+            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
+
+      - name: Commit & tag
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add lib_version/__version__.py
+          git commit -m "chore: bump to ${{ steps.compute.outputs.next }}"
+          git tag "v${{ steps.compute.outputs.next }}"
+          git push origin HEAD --tags
 
       - name: Build package
         run: python setup.py sdist bdist_wheel
