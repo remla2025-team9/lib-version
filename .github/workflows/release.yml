@@ -1,9 +1,16 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      bump_level:
+        description: 'Release level (patch, minor, major)'
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -20,49 +27,45 @@ jobs:
         with:
           python-version: '3.x'
 
-      - id: extract
+      - name: Bump stable version & create tag
+        id: stable
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: ${{ inputs.bump_level || 'patch' }}
+          tag_prefix: v
+          release_branches: main
+
+      - name: Write stable version to file
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - run: |
-          git fetch origin main:main
-          git checkout main
-
-      - run: |
-          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.extract.outputs.version }}"'"/' \
-            lib_version/version.py > tmp && mv tmp lib_version/version.py
-
-      - run: |
+          python scripts/write_version.py
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
           git add lib_version/version.py
-          git commit -m "chore: release ${{ steps.extract.outputs.version }}"
-          git push origin main --tags
+          git commit -m "chore: release ${{ steps.stable.outputs.new_tag }}"
+          git push origin main
 
-      - uses: softprops/action-gh-release@v1
+      - uses: actions/create-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body: "Release ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ steps.stable.outputs.new_tag }}
+          release_name: ${{ steps.stable.outputs.new_tag }}
 
-      - id: compute
+      - name: Bump prerelease version & create tag
+        id: pre
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_prerelease_bump: prerelease
+          append_to_pre_release_tag: pre
+          tag_prefix: v
+          release_branches: '_NONE_'
+          pre_release_branches: main
+
+      - name: Write prerelease version to file
         run: |
-          IFS='.' read MAJOR MINOR PATCH <<<"${{ steps.extract.outputs.version }}"
-          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre1"
-          echo "next=$NEXT" >> $GITHUB_OUTPUT
-
-      - run: |
-          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
-            lib_version/version.py > tmp && mv tmp lib_version/version.py
-
-      - run: |
+          python scripts/write_version.py
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
           git add lib_version/version.py
-          git commit -m "Version bumped to ${{ steps.compute.outputs.next }}"
-          git tag "v${{ steps.compute.outputs.next }}"
+          git commit -m "chore: bump to ${{ steps.pre.outputs.new_tag }}"
           git push origin main --tags
