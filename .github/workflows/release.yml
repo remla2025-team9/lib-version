@@ -27,7 +27,7 @@ jobs:
           VERSION=${TAG#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Switch to main
+      - name: Check out main
         run: |
           git fetch origin main:main
           git checkout main
