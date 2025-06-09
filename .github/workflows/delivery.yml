@@ -12,21 +12,17 @@ jobs:
   bump-prerelease:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Git
-        run: |
+      - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Fetch tags
-        run: git fetch --tags
+      - run: git fetch --tags
 
-      - name: Determine new prerelease
-        id: compute
+      - id: compute
         run: |
           LATEST=$(git tag --list 'v*-pre*' --sort=-v:refname | head -n1)
           if [ -z "$LATEST" ]; then
@@ -41,17 +37,14 @@ jobs:
           NEXT="$BASE-pre$NUM"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
-      - name: Update version.py
-        run: |
+      - run: |
           sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
             lib_version/version.py > tmp && mv tmp lib_version/version.py
 
-      - name: Commit bump
-        run: |
+      - run: |
           git add lib_version/version.py
-          git commit -m "chore: bump to ${{ steps.compute.outputs.next }} [skip ci]"
+          git commit -m "version ${{ steps.compute.outputs.next }}"
 
-      - name: Tag and push
-        run: |
+      - run: |
           git tag "v${{ steps.compute.outputs.next }}"
           git push origin main --tags
