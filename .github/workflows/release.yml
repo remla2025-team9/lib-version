@@ -21,7 +21,8 @@ jobs:
         with:
           python-version: '3.8'
       - run: pip install setuptools wheel setuptools-scm
-      - run: |
+      - name: Print version
+        run: |
           python - <<EOF
 from setuptools_scm import get_version
 print(get_version())
@@ -39,19 +40,22 @@ EOF
         with:
           python-version: '3.8'
       - run: pip install setuptools-scm
-      - run: |
+      - name: Release: write & push
+        run: |
           git config user.name "ci-bot"
           git config user.email "ci@bot"
           python scripts/write_version.py
           git commit -am "release ${GITHUB_REF_NAME}"
           git push
-      - uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: |
+      - name: Bump to prerelease
+        run: |
           ver=${{ github.ref_name#v }}
           IFS='.' read m n p <<< "$ver"
           next=v${m}.${n}.$((p+1))-pre1
@@ -79,7 +83,8 @@ from setuptools_scm import get_version
 print(get_version())
 EOF
 )" >> $GITHUB_OUTPUT
-      - run: |
+      - name: Bump prerelease on main
+        run: |
           base=${{ steps.vars.outputs.CURRENT%-pre* }}
           num=${{ steps.vars.outputs.CURRENT##*-pre }}
           next=${base}-pre$((num+1))
