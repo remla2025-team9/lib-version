@@ -1,9 +1,11 @@
-name: Release
+name: Version Management
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
   push:
-    tags:
-      - 'v*.*.*'
     branches:
       - main
 
@@ -11,7 +13,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  release:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,28 +24,54 @@ jobs:
         with:
           python-version: '3.x'
       - run: |
-          pip install setuptools wheel
-          python setup.py sdist bdist_wheel
+          git fetch --tags
+          NEW="v${{ inputs.version }}"
+          git tag "$NEW"
+          sed -E 's/__version__ = ".*"/__version__ = "'"${{ inputs.version }}"'"/' lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add lib_version/__version__.py
+          git commit -m "chore: release ${{ inputs.version }}"
+          git push origin HEAD --tags
+      - uses: actions/create-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          release_name: v${{ inputs.version }}
+      - run: |
+          IFS='.' read MAJOR MINOR PATCH <<< "${{ inputs.version }}"
+          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre1"
+          git tag "$NEXT"
+          sed -E 's/__version__ = ".*"/__version__ = "'"$NEXT"'"/' lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
+          git add lib_version/__version__.py
+          git commit -m "chore: bump to $NEXT"
+          git push origin HEAD --tags
 
-  bump:
-    needs: build
+  delivery:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
       - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      - id: get_ver
-        run: |
-          echo "::set-output name=ver::$(grep -oP '(?<=__version__\s*=\s*")[^"]+' lib_version/version.py)"
-      - run: |
-          git checkout -B version-bump origin/main
-          BASE=$(echo "${{ steps.get_ver.outputs.ver }}" | cut -d'-' -f1)
-          IFS='.' read M N P <<<"$BASE"
-          NEXT="$M.$N.$((P+1))-pre"
-          sed -E "s/__version__ = \".*\"/__version__ = \"$NEXT\"/" lib_version/version.py > tmp && mv tmp lib_version/version.py
-          git add lib_version/version.py
-          git commit -m "chore: bump to $NEXT [skip ci]"
-          git push origin version-bump:main
+          git fetch --tags
+          LATEST=$(git tag --list '*-pre*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
+            RC=1
+          else
+            BASE=${LATEST%-pre*}
+            RC=${LATEST##*-pre}
+            RC=$((RC+1))
+          fi
+          NEXT="$BASE-pre$RC"
+          git tag "$NEXT"
+          sed -E 's/__version__ = ".*"/__version__ = "'"$NEXT"'"/' lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add lib_version/__version__.py
+          git commit -m "chore: bump to $NEXT"
+          git push origin HEAD --tags
