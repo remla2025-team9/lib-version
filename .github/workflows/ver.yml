@@ -1,4 +1,4 @@
-name: Bump
+name: Release
 
 on:
   push:
@@ -9,32 +9,63 @@ permissions:
   contents: write
 
 jobs:
-  bump-main:
+  release:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: Read released version
-        id: get_ver
+      - name: Extract version from tag
+        id: extract
         run: |
-          VER=$(grep -oP '__version__\s*=\s*"\K[^"]+' lib_version/__version__.py)
-          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Bump to pre-release version
+      - name: Switch to main
         run: |
-          git fetch origin main
-          git checkout -b version-bump origin/main
-          IFS='.' read -r MAJOR MINOR PATCH <<<"${{ steps.get_ver.outputs.version }}"
-          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH+1))-pre"
-          echo "Bumping to version: $NEXT_VERSION"
-          sed -i "s/__version__ = \".*\"/__version__ = \"$NEXT_VERSION\"/" lib_version/__version__.py
-          git add lib_version/__version__.py
-          git commit -m "chore: bump to $NEXT_VERSION [skip ci]"
-          git push origin version-bump:main
+          git fetch origin main:main
+          git checkout main
+
+      - name: Write stable version
+        run: |
+          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.extract.outputs.version }}"'"/' \
+            lib_version/version.py > tmp && mv tmp lib_version/version.py
+
+      - name: Commit stable version
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add lib_version/version.py
+          git commit -m "chore: release ${{ steps.extract.outputs.version }}"
+          git push origin main --tags
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+
+      - name: Compute next prerelease
+        id: next
+        run: |
+          IFS='.' read MAJOR MINOR PATCH <<<"${{ steps.extract.outputs.version }}"
+          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre1"
+          echo "next=$NEXT" >> $GITHUB_OUTPUT
+
+      - name: Write prerelease version
+        run: |
+          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.next.outputs.next }}"'"/' \
+            lib_version/version.py > tmp && mv tmp lib_version/version.py
+
+      - name: Commit & tag prerelease
+        run: |
+          git add lib_version/version.py
+          git commit -m "chore: bump to ${{ steps.next.outputs.next }}"
+          git tag "v${{ steps.next.outputs.next }}"
+          git push origin main --tags
