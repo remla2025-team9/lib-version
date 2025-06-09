@@ -1,11 +1,11 @@
-name: CI
+name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*.*.*'
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -17,80 +17,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
-      - run: pip install setuptools wheel setuptools-scm
-      - name: Print version
-        run: |
-          python - <<EOF
-from setuptools_scm import get_version
-print(get_version())
-EOF
+          python-version: '3.x'
+      - run: |
+          pip install setuptools wheel
+          python setup.py sdist bdist_wheel
 
-  release:
+  bump:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-pre')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
-      - run: pip install setuptools-scm
-      - name: Release: write & push
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - id: get_ver
         run: |
-          git config user.name "ci-bot"
-          git config user.email "ci@bot"
-          python scripts/write_version.py
-          git commit -am "release ${GITHUB_REF_NAME}"
-          git push
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Bump to prerelease
-        run: |
-          ver=${{ github.ref_name#v }}
-          IFS='.' read m n p <<< "$ver"
-          next=v${m}.${n}.$((p+1))-pre1
-          git tag $next
-          python scripts/write_version.py
-          git commit -am "start $next"
-          git push --tags
-
-  deliver:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
-      - run: pip install setuptools-scm
-      - id: vars
-        run: |
-          echo "CURRENT=$(python - <<EOF
-from setuptools_scm import get_version
-print(get_version())
-EOF
-)" >> $GITHUB_OUTPUT
-      - name: Bump prerelease on main
-        run: |
-          base=${{ steps.vars.outputs.CURRENT%-pre* }}
-          num=${{ steps.vars.outputs.CURRENT##*-pre }}
-          next=${base}-pre$((num+1))
-          git config user.name "ci-bot"
-          git config user.email "ci@bot"
-          git tag $next
-          python scripts/write_version.py
-          git commit -am "bump $next"
-          git push --tags
+          echo "::set-output name=ver::$(grep -oP '(?<=__version__\s*=\s*")[^"]+' lib_version/version.py)"
+      - run: |
+          git checkout -B version-bump origin/main
+          BASE=$(echo "${{ steps.get_ver.outputs.ver }}" | cut -d'-' -f1)
+          IFS='.' read M N P <<<"$BASE"
+          NEXT="$M.$N.$((P+1))-pre"
+          sed -E "s/__version__ = \".*\"/__version__ = \"$NEXT\"/" lib_version/version.py > tmp && mv tmp lib_version/version.py
+          git add lib_version/version.py
+          git commit -m "chore: bump to $NEXT [skip ci]"
+          git push origin version-bump:main
