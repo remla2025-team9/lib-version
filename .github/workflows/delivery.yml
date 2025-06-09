@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  delivery:
+  bump-prerelease:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,7 @@ jobs:
       - name: Fetch tags
         run: git fetch --tags
 
-      - name: Determine next pre-release
+      - name: Compute next prerelease
         id: compute
         run: |
           LATEST=$(git tag --list '*-pre*' --sort=-v:refname | head -n1)
@@ -39,25 +39,16 @@ jobs:
           NEXT="$BASE-pre$COUNT"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
-      - name: Write new pre-release
+      - name: Write new prerelease
         run: |
           sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
-            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
+            lib_version/version_util.py > tmp && mv tmp lib_version/version_util.py
 
       - name: Commit & tag
         run: |
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
-          git add lib_version/__version__.py
+          git add lib_version/version_util.py
           git commit -m "chore: bump to ${{ steps.compute.outputs.next }}"
           git tag "v${{ steps.compute.outputs.next }}"
-          git push origin HEAD --tags
-
-      - name: Build package
-        run: python setup.py sdist bdist_wheel
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-package
-          path: dist/*
+          git push origin HEAD:main --tags
