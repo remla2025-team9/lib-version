@@ -2,35 +2,49 @@ name: Delivery
 
 on:
   push:
-    branches: [main]
-    tags: ['v*.*.*']
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
-  delivery:
+  bump-prerelease:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Auto-tag pre-releases
-        if: github.ref == 'refs/heads/main'
-        uses: mathieudutour/github-tag-action@v6.2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag_prefix: v
-          default_bump: patch
-          release_branches: ""
-          pre_release_branches: main
-          default_prerelease_bump: prerelease
-          append_to_pre_release_tag: pre
+          fetch-depth: 0
 
-      - name: Build package
-        run: python setup.py sdist bdist_wheel
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-package
-          path: dist/*
+      - run: git fetch --tags
+
+      - id: compute
+        run: |
+          LATEST=$(git tag --list 'v*-pre*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
+            NUM=1
+          else
+            BASE=${LATEST#v}
+            BASE=${BASE%-pre*}
+            NUM=${LATEST##*-pre}
+            NUM=$((NUM+1))
+          fi
+          NEXT="$BASE-pre$NUM"
+          echo "next=$NEXT" >> $GITHUB_OUTPUT
+
+      - run: |
+          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
+            lib_version/version.py > tmp && mv tmp lib_version/version.py
+
+      - run: |
+          git add lib_version/version.py
+          git commit -m "Version bumped to ${{ steps.compute.outputs.next }}"
+
+      - run: |
+          git tag "v${{ steps.compute.outputs.next }}"
+          git push origin main --tags
