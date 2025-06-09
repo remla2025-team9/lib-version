@@ -9,10 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  bump:
+  bump-prerelease:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -22,30 +22,36 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Read current version
-        id: get_ver
-        run: |
-          VER=$(grep -oP '__version__ = "\K[^"]+' lib_version/version.py)
-          echo "ver=$VER" >> $GITHUB_OUTPUT
+      - name: Fetch tags
+        run: git fetch --tags
 
-      - name: Compute next prerelease
+      - name: Determine new prerelease
         id: compute
         run: |
-          BASE=${{ steps.get_ver.outputs.ver%%-* }}
-          IFS='.' read M N P <<<"$BASE"
-          NEXT="$M.$N.$((P+1))-pre"
+          LATEST=$(git tag --list 'v*-pre*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST" ]; then
+            BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
+            NUM=1
+          else
+            BASE=${LATEST#v}
+            BASE=${BASE%-pre*}
+            NUM=${LATEST##*-pre}
+            NUM=$((NUM+1))
+          fi
+          NEXT="$BASE-pre$NUM"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
-      - name: Write and commit bump
+      - name: Update version.py
         run: |
-          git checkout main
-          sed -E "s/^__version__ = \".*\"/__version__ = \"${{ steps.compute.outputs.next }}\"/" \
+          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
             lib_version/version.py > tmp && mv tmp lib_version/version.py
+
+      - name: Commit bump
+        run: |
           git add lib_version/version.py
           git commit -m "chore: bump to ${{ steps.compute.outputs.next }} [skip ci]"
-          git push origin main
 
       - name: Tag and push
         run: |
           git tag "v${{ steps.compute.outputs.next }}"
-          git push origin "v${{ steps.compute.outputs.next }}"
+          git push origin main --tags
