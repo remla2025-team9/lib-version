@@ -7,8 +7,8 @@ This library is intended for reuse across other services like `app-service`.
 
 ## Features
 
-- Retrieves version from `__version__.py`
-- Automatically updated using GitHub Actions and tags
+- Retrieves version from Git metadata via `setuptools_scm`
+- Automatically updated using the `release.yml` workflow on tag push
 - Can be installed via pip from GitHub
 
 ---
@@ -16,7 +16,7 @@ This library is intended for reuse across other services like `app-service`.
 ## Install
 
 ```bash
-pip install git+https://github.com/remla2025-team9/lib-version.git@v1.0.0
+pip install git+https://github.com/remla2025-team9/lib-version.git@v2.0.0
 ```
 
 ---
@@ -72,10 +72,10 @@ fetch("/api/version")
 ## Tagging a New Version
 
 ```bash
-git tag v1.0.3
-git push origin v1.0.3
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 This runs:
-- `delivery.yml` to build and upload
-- `ver.yml` to bump to next `-pre` version
+- `release.yml` to build and upload
+- automatic bump to the next `-pre` version
