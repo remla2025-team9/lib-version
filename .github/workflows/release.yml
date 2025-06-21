@@ -85,7 +85,7 @@ jobs:
           git add lib_version/version.py
           git commit -m "Release v${{ steps.bump.outputs.stable }} [skip ci]"
           git tag "v${{ steps.bump.outputs.stable }}"
-          git push origin 5-fix-versioning --tags
+          git push origin main --tags
 
       # Create GitHub release for the new version
       - name: Create GitHub Release
@@ -115,4 +115,4 @@ jobs:
           git add lib_version/version.py
           git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }}"
           git tag "v${{ steps.pre.outputs.next }}"
-          git push origin 5-fix-versioning --tags
+          git push origin main --tags
