@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+env:
+  GIT_USER_NAME: "github-actions[bot]"
+  GIT_USER_EMAIL: "github-actions[bot]@users.noreply.github.com"
+
 jobs:
   bump-prerelease:
     runs-on: ubuntu-latest
@@ -19,10 +23,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Configure Git identity for automated commits
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Sets up Git identity for automated commits
+      - name: Configure Git
+        run: |
+          git config user.name "${{ env.GIT_USER_NAME }}"
+          git config user.email "${{ env.GIT_USER_EMAIL }}"
+          git remote set-url origin git@github.com:${{ github.repository }}.git
+
+      # Sets up SSH for pushing changes to the repository to bypass branch protection rules
+      - name: Setup SSH for pushing
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PRIVATE }}
 
       # Ensure we have all tags for version determination
       - run: git fetch --tags
