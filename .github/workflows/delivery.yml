@@ -1,10 +1,12 @@
 name: Delivery
 
+# Trigger workflow on pushes to main branch
 on:
   push:
     branches:
       - main
 
+# Allow workflow to create and push tags
 permissions:
   contents: write
 
@@ -12,16 +14,20 @@ jobs:
   bump-prerelease:
     runs-on: ubuntu-latest
     steps:
+      # Checkout repository with full history
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Configure Git identity for automated commits
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # Ensure we have all tags for version determination
       - run: git fetch --tags
 
+      # Calculate next pre-release version number
       - id: compute
         run: |
           LATEST=$(git tag --list 'v*-pre*' --sort=-v:refname | head -n1)
@@ -37,14 +43,17 @@ jobs:
           NEXT="$BASE-pre$NUM"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
+      # Update version file with new pre-release version
       - run: |
           sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
             lib_version/version.py > tmp && mv tmp lib_version/version.py
 
+      # Commit version changes to repository
       - run: |
           git add lib_version/version.py
-          git commit -m "Version bumped to ${{ steps.compute.outputs.next }}"
+          git commit -m "Version bumped to ${{ steps.compute.outputs.next }} [skip ci]"
 
+      # Create tag and push changes to GitHub
       - run: |
           git tag "v${{ steps.compute.outputs.next }}"
-          git push origin main --tags
+          git push origin
