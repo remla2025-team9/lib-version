@@ -9,9 +9,10 @@ on:
         required: true
         type: choice
         options:
-          - major
-          - minor
           - patch
+          - minor
+          - major
+        default: patch
 
 # Allow workflow to create and push tags
 permissions:
@@ -40,15 +41,34 @@ jobs:
       - name: Determine new stable version
         id: bump
         run: |
+          # Get latest non-prerelease tag or use 0.0.0 if none exists
           LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -v '-pre' | head -n1)
-          BASE=${LATEST_TAG#v}
-          IFS='.' read MAJOR MINOR PATCH <<< "$BASE"
+          echo "Latest stable tag: $LATEST_TAG"
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing tags found, starting with 0.0.0"
+            BASE="0.0.0"
+          else
+            BASE=${LATEST_TAG#v}
+          fi
+          
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+          
+          # Handle invalid or missing version components
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+          
+          # Bump version according to selected level
           case "${{ inputs.bump_level }}" in
             major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0;;
             minor) MINOR=$((MINOR+1)); PATCH=0;;
             patch) PATCH=$((PATCH+1));;
           esac
+          
           NEW_STABLE="$MAJOR.$MINOR.$PATCH"
+          echo "New stable version: $NEW_STABLE"
           echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT
 
       # Update version file with new stable version
@@ -65,7 +85,7 @@ jobs:
           git add lib_version/version.py
           git commit -m "Release v${{ steps.bump.outputs.stable }} [skip ci]"
           git tag "v${{ steps.bump.outputs.stable }}"
-          git push origin 5-fix-versioning --tags
+          git push origin main --tags
 
       # Create GitHub release for the new version
       - name: Create GitHub Release
@@ -73,12 +93,13 @@ jobs:
         with:
           tag: v${{ steps.bump.outputs.stable }}
           name: v${{ steps.bump.outputs.stable }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Calculate next pre-release version for development
       - name: Determine next prerelease
         id: pre
         run: |
-          IFS='.' read MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
           NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre1"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
@@ -92,6 +113,6 @@ jobs:
       - name: Commit & tag prerelease
         run: |
           git add lib_version/version.py
-          git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }} [skip ci]"
+          git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }}"
           git tag "v${{ steps.pre.outputs.next }}"
-          git push origin 5-fix-versioning --tags
+          git push origin main --tags
