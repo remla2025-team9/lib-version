@@ -30,17 +30,20 @@ jobs:
       # Calculate next pre-release version number
       - id: compute
         run: |
-          LATEST=$(git tag --list 'v*-pre*' --sort=-v:refname | head -n1)
+          LATEST=$(git tag --list 'v*-pre-*' --sort=-v:refname | head -n1)
           if [ -z "$LATEST" ]; then
             BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
-            NUM=1
+            if [ -z "$BASE" ]; then
+              BASE="0.0.1"
+            fi
+            NUM=0
           else
             BASE=${LATEST#v}
-            BASE=${BASE%-pre*}
-            NUM=${LATEST##*-pre}
+            BASE=${BASE%-pre-*}
+            NUM=${LATEST##*-pre-}
             NUM=$((NUM+1))
           fi
-          NEXT="$BASE-pre$NUM"
+          NEXT="$BASE-pre-$NUM"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
       # Update version file with new pre-release version
@@ -56,4 +59,4 @@ jobs:
       # Create tag and push changes to GitHub
       - run: |
           git tag "v${{ steps.compute.outputs.next }}"
-          git push origin
+          git push origin main --tags

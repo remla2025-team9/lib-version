@@ -100,7 +100,7 @@ jobs:
         id: pre
         run: |
           IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
-          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre1"
+          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre-0"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
       # Update version file with pre-release version
