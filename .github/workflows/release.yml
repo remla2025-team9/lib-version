@@ -87,10 +87,14 @@ jobs:
           NEW_STABLE="$MAJOR.$MINOR.$PATCH"
           echo "New stable version: $NEW_STABLE"
           echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT      # Update version file with new stable version
+      
+      # Update version file with new stable version
       - name: Update version.py to stable
         run: |
           sed -E 's/^version = ".*"/version = "'"${{ steps.bump.outputs.stable }}"'"/' \
             lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py      # Commit changes and create version tag
+      
+      # Commit and tag stable version
       - name: Commit & push stable
         run: |
           git add lib_version/__version__.py
@@ -122,6 +126,6 @@ jobs:
       - name: Commit & tag prerelease
         run: |
           git add lib_version/__version__.py
-          git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }}"
+          git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }} [skip ci]"
           git tag "v${{ steps.pre.outputs.next }}"
           git push origin main --tags
