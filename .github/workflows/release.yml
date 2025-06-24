@@ -1,5 +1,6 @@
 name: Release
 
+# Trigger workflow manually with version bump choice
 on:
   workflow_dispatch:
     inputs:
@@ -8,75 +9,122 @@ on:
         required: true
         type: choice
         options:
-          - major
-          - minor
           - patch
+          - minor
+          - major
+        default: patch
 
+# Allow workflow to create and push tags
 permissions:
   contents: write
+
+env:
+  GIT_USER_NAME: "github-actions[bot]"
+  GIT_USER_EMAIL: "github-actions[bot]@users.noreply.github.com"
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # Checkout repository with full history
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
+      # Sets up Git identity for automated commits
+      - name: Configure Git
+        run: |
+          git config user.name "${{ env.GIT_USER_NAME }}"
+          git config user.email "${{ env.GIT_USER_EMAIL }}"
+          git remote set-url origin git@github.com:${{ github.repository }}.git
+
+      # Sets up SSH for pushing changes to the repository to bypass branch protection rules
+      - name: Setup SSH for pushing
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY_PRIVATE }}
+
+      # Ensure we have all tags for version determination
       - name: Fetch tags
         run: git fetch --tags
 
+      # Calculate new stable version based on selected bump level
       - name: Determine new stable version
         id: bump
         run: |
-          LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
-          BASE=${LATEST_TAG#v}
-          IFS='.' read MAJOR MINOR PATCH <<< "$BASE"
+          # Get latest non-prerelease tag or use 0.0.0 if none exists
+          LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -v -- '-pre' | head -n1)
+          echo "Latest stable tag: $LATEST_TAG"
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing tags found, starting with 0.0.0"
+            BASE="0.0.0"
+          else
+            BASE=${LATEST_TAG#v}
+          fi
+          
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+          
+          # Handle invalid or missing version components
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+          
+          # Bump version according to selected level
           case "${{ inputs.bump_level }}" in
             major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0;;
             minor) MINOR=$((MINOR+1)); PATCH=0;;
             patch) PATCH=$((PATCH+1));;
           esac
+          
           NEW_STABLE="$MAJOR.$MINOR.$PATCH"
+          echo "New stable version: $NEW_STABLE"
           echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT
 
+      # Update version file with new stable version
       - name: Update version.py to stable
         run: |
           sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.bump.outputs.stable }}"'"/' \
             lib_version/version.py > tmp && mv tmp lib_version/version.py
 
+      # Commit changes and create version tag
       - name: Commit & push stable
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add lib_version/version.py
-          git commit -m "Release v${{ steps.bump.outputs.stable }}"
+          git commit -m "Release v${{ steps.bump.outputs.stable }} [skip ci]"
           git tag "v${{ steps.bump.outputs.stable }}"
           git push origin main --tags
 
+      # Create GitHub release for the new version
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: v${{ steps.bump.outputs.stable }}
-          release_name: v${{ steps.bump.outputs.stable }}
+          tag: v${{ steps.bump.outputs.stable }}
+          name: v${{ steps.bump.outputs.stable }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Calculate next pre-release version for development
       - name: Determine next prerelease
         id: pre
         run: |
-          IFS='.' read MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
-          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre1"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
+          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre-0"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
+      # Update version file with pre-release version
       - name: Update version.py to prerelease
         run: |
           sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.pre.outputs.next }}"'"/' \
             lib_version/version.py > tmp && mv tmp lib_version/version.py
 
+      # Commit and tag pre-release version
       - name: Commit & tag prerelease
         run: |
           git add lib_version/version.py
