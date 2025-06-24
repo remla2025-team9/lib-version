@@ -8,7 +8,7 @@ with open(os.path.join("lib_version", "__version__.py")) as f:
 
 setup(
     name="lib_version",
-    version=version["__version__"],
+    version=version["version"],
     description="A reusable Python library for retrieving its own version.",
     packages=find_packages(),
     include_package_data=True,

@@ -45,7 +45,7 @@ jobs:
         run: |
           LATEST=$(git tag --list 'v*-pre-*' --sort=-v:refname | head -n1)
           if [ -z "$LATEST" ]; then
-            BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 | sed 's/^v//')
+            BASE=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -v -- '-pre' | head -n1 | sed 's/^v//')
             if [ -z "$BASE" ]; then
               BASE="0.0.1"
             fi
@@ -56,20 +56,20 @@ jobs:
             NUM=${LATEST##*-pre-}
             NUM=$((NUM+1))
           fi
-          NEXT="$BASE-pre-$NUM"
+          NEXT="v$BASE-pre-$NUM"
           echo "next=$NEXT" >> $GITHUB_OUTPUT
 
       # Update version file with new pre-release version
       - run: |
-          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.compute.outputs.next }}"'"/' \
-            lib_version/version.py > tmp && mv tmp lib_version/version.py
+          sed -E 's/^version = ".*"/version = "'"${{ steps.compute.outputs.next }}"'"/' \
+            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
 
       # Commit version changes to repository
       - run: |
-          git add lib_version/version.py
+          git add lib_version/__version__.py
           git commit -m "Version bumped to ${{ steps.compute.outputs.next }} [skip ci]"
 
       # Create tag and push changes to GitHub
       - run: |
-          git tag "v${{ steps.compute.outputs.next }}"
+          git tag "${{ steps.compute.outputs.next }}"
           git push origin main --tags
