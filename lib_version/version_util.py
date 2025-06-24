@@ -16,7 +16,7 @@ class VersionUtil:
         Get the current version of lib_version.
         
         Returns:
-            str: The version string (e.g., "1.0.1" or "1.0.1-pre-1")
+            str: The version string (e.g., "v1.0.1" or "v1.0.1-pre-1")
             
         Notes:
             First attempts to get version from local __version__.py file.
@@ -29,7 +29,8 @@ class VersionUtil:
             # Fall back to installed package metadata
             try:
                 import importlib.metadata
-                return importlib.metadata.version("lib_version")
+                version = importlib.metadata.version("lib_version")
+                return f"v{version}"  # Add v prefix to match our new format
             except:
                 return "NOT_SET"
 

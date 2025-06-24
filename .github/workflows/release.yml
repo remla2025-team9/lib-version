@@ -84,39 +84,43 @@ jobs:
             patch) PATCH=$((PATCH+1));;
           esac
           
-          NEW_STABLE="$MAJOR.$MINOR.$PATCH"
+          NEW_STABLE="v$MAJOR.$MINOR.$PATCH"
           echo "New stable version: $NEW_STABLE"
-          echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT      # Update version file with new stable version
+          echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT
       
       # Update version file with new stable version
       - name: Update version.py to stable
         run: |
           sed -E 's/^version = ".*"/version = "'"${{ steps.bump.outputs.stable }}"'"/' \
-            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py      # Commit changes and create version tag
+            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
       
       # Commit and tag stable version
       - name: Commit & push stable
         run: |
           git add lib_version/__version__.py
-          git commit -m "Release v${{ steps.bump.outputs.stable }} [skip ci]"
-          git tag "v${{ steps.bump.outputs.stable }}"
+          git commit -m "Release ${{ steps.bump.outputs.stable }} [skip ci]"
+          git tag "${{ steps.bump.outputs.stable }}"
           git push origin main --tags
 
       # Create GitHub release for the new version
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: v${{ steps.bump.outputs.stable }}
-          name: v${{ steps.bump.outputs.stable }}
+          tag: ${{ steps.bump.outputs.stable }}
+          name: ${{ steps.bump.outputs.stable }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Calculate next pre-release version for development
       - name: Determine next prerelease
         id: pre
         run: |
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
-          NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre-0"
-          echo "next=$NEXT" >> $GITHUB_OUTPUT      # Update version file with pre-release version
+          STABLE="${{ steps.bump.outputs.stable }}"
+          BASE=${STABLE#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+          NEXT="v$MAJOR.$MINOR.$((PATCH+1))-pre-0"
+          echo "next=$NEXT" >> $GITHUB_OUTPUT
+      
+      # Update version file with pre-release version
       - name: Update version.py to prerelease
         run: |
           sed -E 's/^version = ".*"/version = "'"${{ steps.pre.outputs.next }}"'"/' \
@@ -126,6 +130,6 @@ jobs:
       - name: Commit & tag prerelease
         run: |
           git add lib_version/__version__.py
-          git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }} [skip ci]"
-          git tag "v${{ steps.pre.outputs.next }}"
+          git commit -m "Bump to prerelease ${{ steps.pre.outputs.next }} [skip ci]"
+          git tag "${{ steps.pre.outputs.next }}"
           git push origin main --tags
