@@ -108,6 +108,16 @@ jobs:
         with:
           tag: ${{ steps.bump.outputs.stable }}
           name: ${{ steps.bump.outputs.stable }}
+          body: |
+            ## Installation
+                    
+            ### From Git Tag
+            ```bash
+            pip install git+https://github.com/${{ github.repository }}.git@${{ steps.tag_version.outputs.new_tag }}
+            ```
+            
+            ## Contents
+            - Source code (.tar.gz and .zip)
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Calculate next pre-release version for development
