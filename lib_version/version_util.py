@@ -1,14 +1,38 @@
-try:
-    from importlib.metadata import version, PackageNotFoundError
-except ImportError:
-    from importlib_metadata import version, PackageNotFoundError
+"""
+Version utility module for retrieving the current version of lib-version.
 
-from . import version as local_version
+This module provides a centralized way to get the version, falling back to
+package metadata if the local version file is unavailable.
+"""
+
+from lib_version.__version__ import version as local_version
 
 class VersionUtil:
+    """Utility class for retrieving the library version."""
+    
     @staticmethod
     def get_version():
+        """
+        Get the current version of lib_version.
+        
+        Returns:
+            str: The version string (e.g., "1.0.1" or "1.0.1-pre-1")
+            
+        Notes:
+            First attempts to get version from local __version__.py file.
+            Falls back to installed package metadata if local file unavailable.
+        """
         try:
-            return version("lib-version")
-        except PackageNotFoundError:
-            return local_version.__version__
+            # Try to get version from local version file first
+            return local_version
+        except (AttributeError, ImportError):
+            # Fall back to installed package metadata
+            try:
+                import importlib.metadata
+                return importlib.metadata.version("lib_version")
+            except:
+                return "NOT_SET"
+
+
+if __name__ == "__main__":
+    print(f"lib-version: {VersionUtil.get_version()}")

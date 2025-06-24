@@ -86,18 +86,14 @@ jobs:
           
           NEW_STABLE="$MAJOR.$MINOR.$PATCH"
           echo "New stable version: $NEW_STABLE"
-          echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT
-
-      # Update version file with new stable version
+          echo "stable=$NEW_STABLE" >> $GITHUB_OUTPUT      # Update version file with new stable version
       - name: Update version.py to stable
         run: |
-          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.bump.outputs.stable }}"'"/' \
-            lib_version/version.py > tmp && mv tmp lib_version/version.py
-
-      # Commit changes and create version tag
+          sed -E 's/^version = ".*"/version = "'"${{ steps.bump.outputs.stable }}"'"/' \
+            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py      # Commit changes and create version tag
       - name: Commit & push stable
         run: |
-          git add lib_version/version.py
+          git add lib_version/__version__.py
           git commit -m "Release v${{ steps.bump.outputs.stable }} [skip ci]"
           git tag "v${{ steps.bump.outputs.stable }}"
           git push origin main --tags
@@ -116,18 +112,16 @@ jobs:
         run: |
           IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bump.outputs.stable }}"
           NEXT="$MAJOR.$MINOR.$((PATCH+1))-pre-0"
-          echo "next=$NEXT" >> $GITHUB_OUTPUT
-
-      # Update version file with pre-release version
+          echo "next=$NEXT" >> $GITHUB_OUTPUT      # Update version file with pre-release version
       - name: Update version.py to prerelease
         run: |
-          sed -E 's/^__version__ = ".*"/__version__ = "'"${{ steps.pre.outputs.next }}"'"/' \
-            lib_version/version.py > tmp && mv tmp lib_version/version.py
+          sed -E 's/^version = ".*"/version = "'"${{ steps.pre.outputs.next }}"'"/' \
+            lib_version/__version__.py > tmp && mv tmp lib_version/__version__.py
 
       # Commit and tag pre-release version
       - name: Commit & tag prerelease
         run: |
-          git add lib_version/version.py
+          git add lib_version/__version__.py
           git commit -m "Bump to prerelease v${{ steps.pre.outputs.next }}"
           git tag "v${{ steps.pre.outputs.next }}"
           git push origin main --tags
