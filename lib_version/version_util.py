@@ -30,7 +30,7 @@ class VersionUtil:
             try:
                 import importlib.metadata
                 version = importlib.metadata.version("lib_version")
-                return f"v{version}"  # Add v prefix to match our new format
+                return f"v{version}"
             except:
                 return "NOT_SET"
 
